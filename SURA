@@ -1,0 +1,67 @@
+Option Explicit
+
+Sub ARMAR_LAYOUT_MESA()
+
+    Dim wsDatos As Worksheet
+    Dim wsLayout As Worksheet
+    Dim lastRow As Long, lastCol As Long
+    Dim i As Long, j As Long
+    Dim colDestino As Long
+    Dim filaCajas As Long
+    
+    Set wsDatos = ThisWorkbook.Sheets("Datos")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    
+    Application.ScreenUpdating = False
+    
+    'Limpiar Layout Mesa
+    wsLayout.Cells.Clear
+    
+    'Última fila y columna en Datos
+    lastRow = wsDatos.Cells(wsDatos.Rows.Count, "A").End(xlUp).Row
+    lastCol = wsDatos.Cells(1, wsDatos.Columns.Count).End(xlToLeft).Column
+    
+    'Poner subtítulos/cajas de E en adelante en columna A, desde A5
+    filaCajas = 5
+    
+    For j = 5 To lastCol
+        wsLayout.Cells(filaCajas, "A").Value = wsDatos.Cells(1, j).Value
+        filaCajas = filaCajas + 1
+    Next j
+    
+    'Pasar cada fila de Datos a una columna en Layout Mesa
+    colDestino = 3 'Empieza en C
+    
+    For i = 2 To lastRow
+        
+        'Fila 2: Emisora
+        wsLayout.Cells(2, colDestino).Value = wsDatos.Cells(i, "B").Value
+        
+        'Fila 3: Precio
+        wsLayout.Cells(3, colDestino).Value = wsDatos.Cells(i, "C").Value
+        
+        'Fila 4: Operación
+        wsLayout.Cells(4, colDestino).Value = wsDatos.Cells(i, "A").Value
+        
+        'Fila 5 en adelante: montos de cajas E:lastCol
+        filaCajas = 5
+        
+        For j = 5 To lastCol
+            wsLayout.Cells(filaCajas, colDestino).Value = wsDatos.Cells(i, j).Value
+            filaCajas = filaCajas + 1
+        Next j
+        
+        colDestino = colDestino + 1
+    
+    Next i
+    
+    'Formato básico
+    wsLayout.Columns.AutoFit
+    wsLayout.Rows("2:4").Font.Bold = True
+    wsLayout.Columns("A").Font.Bold = True
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Layout Mesa generado correctamente.", vbInformation
+
+End Sub
