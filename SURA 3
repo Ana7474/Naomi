@@ -1,0 +1,62 @@
+Option Explicit
+
+Sub ARMAR_LAYOUT_MESA()
+
+    Dim wsDatos As Worksheet
+    Dim wsLayout As Worksheet
+    Dim lastRow As Long, lastCol As Long
+    Dim i As Long, j As Long
+    Dim colDestino As Long
+    Dim filaCajas As Long
+    Dim lastColLayout As Long
+    Dim lastFilaCajas As Long
+    
+    Set wsDatos = ThisWorkbook.Sheets("Datos")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    
+    Application.ScreenUpdating = False
+    
+    lastRow = wsDatos.Cells(wsDatos.Rows.Count, "A").End(xlUp).Row
+    lastCol = wsDatos.Cells(1, wsDatos.Columns.Count).End(xlToLeft).Column
+    
+    lastColLayout = 3 + (lastRow - 2)
+    lastFilaCajas = 5 + (lastCol - 5)
+    
+    'Limpia SOLO el área que vamos a volver a llenar
+    'No toca encabezados/formato ni columnas fuera del rango necesario
+    wsLayout.Range(wsLayout.Cells(2, 3), wsLayout.Cells(lastFilaCajas, lastColLayout)).ClearContents
+    wsLayout.Range(wsLayout.Cells(5, 2), wsLayout.Cells(lastFilaCajas, 2)).ClearContents
+    
+    'Cajas de Datos E en adelante van en Layout Mesa columna B
+    filaCajas = 5
+    
+    For j = 5 To lastCol
+        wsLayout.Cells(filaCajas, "B").Value = wsDatos.Cells(1, j).Value
+        filaCajas = filaCajas + 1
+    Next j
+    
+    'Cada fila de Datos se vuelve una columna en Layout Mesa, desde C
+    colDestino = 3
+    
+    For i = 2 To lastRow
+        
+        wsLayout.Cells(2, colDestino).Value = wsDatos.Cells(i, "B").Value 'Emisora
+        wsLayout.Cells(3, colDestino).Value = wsDatos.Cells(i, "C").Value 'Precio
+        wsLayout.Cells(4, colDestino).Value = wsDatos.Cells(i, "A").Value 'Operación
+        
+        filaCajas = 5
+        
+        For j = 5 To lastCol
+            wsLayout.Cells(filaCajas, colDestino).Value = wsDatos.Cells(i, j).Value
+            filaCajas = filaCajas + 1
+        Next j
+        
+        colDestino = colDestino + 1
+    
+    Next i
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Layout Mesa generado correctamente.", vbInformation
+
+End Sub
