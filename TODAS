@@ -1,0 +1,30 @@
+Option Explicit
+
+Sub EJECUTAR_MACRO_SELECCIONADA()
+
+    Dim wsMacro As Worksheet
+    Dim seleccion As String
+    
+    Set wsMacro = ThisWorkbook.Sheets("MACRO")
+    
+    seleccion = UCase(Trim(CStr(wsMacro.Range("C11").Value)))
+    
+    Select Case seleccion
+    
+        Case "SURA"
+            Call SURA
+        
+        Case "SIGLO XXI"
+            Call XXI
+        
+        Case "AFORE COPPEL"
+            Call AforeCoppel
+        
+        Case Else
+            MsgBox "No se encontró una macro válida para: " & wsMacro.Range("C11").Value & vbCrLf & _
+                   "Opciones válidas: SURA, SIGLO XXI o AFORE COPPEL.", _
+                   vbExclamation, "Selección no válida"
+    
+    End Select
+
+End Sub
