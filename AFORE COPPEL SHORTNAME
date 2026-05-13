@@ -1,0 +1,209 @@
+Option Explicit
+
+Sub AforeCoppel()
+
+    Dim wsLayout As Worksheet
+    Dim wsShortname As Worksheet
+    Dim wbExt As Workbook
+    Dim wsExt As Worksheet
+    Dim archivo As Variant
+    
+    Dim dictCuentas As Object
+    Dim dictFilasCuentas As Object
+    Dim dictColumnasHoja As Object
+    
+    Dim lastRow As Long
+    Dim i As Long
+    Dim filaCuenta As Long
+    Dim colOperacion As Long
+    Dim lastColLayout As Long
+    Dim lastRowCuentas As Long
+    
+    Dim emisora As String
+    Dim sentido As String
+    Dim precio As Variant
+    Dim cuenta As String
+    Dim monto As Double
+    Dim filaDestino As Long
+    
+    Dim celdaEncontrada As Range
+    
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    Set wsShortname = ThisWorkbook.Sheets("Shortname")
+    
+    Set dictCuentas = CreateObject("Scripting.Dictionary")
+    Set dictFilasCuentas = CreateObject("Scripting.Dictionary")
+    Set dictColumnasHoja = CreateObject("Scripting.Dictionary")
+    
+    archivo = Application.GetOpenFilename( _
+        FileFilter:="Archivos de Excel (*.xls*), *.xls*", _
+        Title:="Selecciona el archivo de Afore Coppel")
+    
+    If archivo = False Then Exit Sub
+    
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    
+    Set wbExt = Workbooks.Open(archivo)
+    
+    'Limpiar solo contenidos del área que se va a rellenar, sin borrar formatos
+    wsLayout.Range("C2:ZZ10000").ClearContents
+    wsLayout.Range("B5:B10000").ClearContents
+    
+    'PRIMERA PASADA:
+    'Crear columnas por hoja/operación y juntar cuentas únicas con monto
+    filaCuenta = 5
+    colOperacion = 3 'Empieza en C
+    
+    For Each wsExt In wbExt.Worksheets
+        
+        emisora = Trim(CStr(wsExt.Range("C11").Value))
+        sentido = Trim(CStr(wsExt.Range("B11").Value))
+        precio = wsExt.Range("F11").Value
+        
+        If emisora <> "" And sentido <> "" Then
+            
+            wsLayout.Cells(2, colOperacion).Value = emisora
+            wsLayout.Cells(3, colOperacion).Value = precio
+            wsLayout.Cells(4, colOperacion).Value = sentido
+            
+            dictColumnasHoja.Add wsExt.Name, colOperacion
+            
+            colOperacion = colOperacion + 1
+        
+        End If
+        
+        lastRow = wsExt.Cells(wsExt.Rows.Count, "F").End(xlUp).Row
+        
+        For i = 15 To lastRow
+            
+            cuenta = Trim(CStr(wsExt.Cells(i, "F").Value))
+            
+            If cuenta <> "" Then
+                
+                If EsMontoValido(wsExt.Cells(i, "G").Value) Then
+                    
+                    If Not dictCuentas.Exists(cuenta) Then
+                        
+                        dictCuentas.Add cuenta, filaCuenta
+                        dictFilasCuentas.Add cuenta, filaCuenta
+                        wsLayout.Cells(filaCuenta, "B").Value = cuenta
+                        
+                        filaCuenta = filaCuenta + 1
+                    
+                    End If
+                
+                End If
+            
+            End If
+        
+        Next i
+    
+    Next wsExt
+    
+    lastColLayout = colOperacion - 1
+    lastRowCuentas = filaCuenta - 1
+    
+    'SEGUNDA PASADA:
+    'Llenar los montos en la intersección cuenta + operación
+    For Each wsExt In wbExt.Worksheets
+        
+        If dictColumnasHoja.Exists(wsExt.Name) Then
+            
+            colOperacion = dictColumnasHoja(wsExt.Name)
+            lastRow = wsExt.Cells(wsExt.Rows.Count, "F").End(xlUp).Row
+            
+            For i = 15 To lastRow
+                
+                cuenta = Trim(CStr(wsExt.Cells(i, "F").Value))
+                
+                If cuenta <> "" Then
+                    
+                    If EsMontoValido(wsExt.Cells(i, "G").Value) Then
+                        
+                        monto = NumeroSeguro(wsExt.Cells(i, "G").Value)
+                        
+                        If dictFilasCuentas.Exists(cuenta) Then
+                            filaDestino = dictFilasCuentas(cuenta)
+                            wsLayout.Cells(filaDestino, colOperacion).Value = monto
+                        End If
+                    
+                    End If
+                
+                End If
+            
+            Next i
+        
+        End If
+    
+    Next wsExt
+    
+    'Reemplazar cuentas de Layout Mesa columna B usando Shortname
+    For i = 5 To lastRowCuentas
+        
+        cuenta = Trim(CStr(wsLayout.Cells(i, "B").Value))
+        
+        If cuenta <> "" Then
+            
+            Set celdaEncontrada = wsShortname.Columns("F").Find( _
+                What:=cuenta, _
+                LookIn:=xlValues, _
+                LookAt:=xlWhole, _
+                MatchCase:=False)
+            
+            If Not celdaEncontrada Is Nothing Then
+                wsLayout.Cells(i, "B").Value = wsShortname.Cells(celdaEncontrada.Row, "A").Value
+            End If
+        
+        End If
+    
+    Next i
+    
+    wbExt.Close SaveChanges:=False
+    
+    Application.DisplayAlerts = True
+    Application.ScreenUpdating = True
+    
+    MsgBox "Layout Mesa generado correctamente para Afore Coppel.", vbInformation
+
+End Sub
+
+Private Function EsMontoValido(ByVal valor As Variant) As Boolean
+    
+    Dim n As Double
+    
+    If Trim(CStr(valor)) = "" Then
+        EsMontoValido = False
+        Exit Function
+    End If
+    
+    n = NumeroSeguro(valor)
+    
+    If n = 0 Then
+        EsMontoValido = False
+    Else
+        EsMontoValido = True
+    End If
+
+End Function
+
+Private Function NumeroSeguro(ByVal valor As Variant) As Double
+    
+    Dim texto As String
+    
+    If IsNumeric(valor) Then
+        NumeroSeguro = CDbl(valor)
+    Else
+        texto = Trim(CStr(valor))
+        texto = Replace(texto, ",", "")
+        texto = Replace(texto, "$", "")
+        texto = Replace(texto, " ", "")
+        
+        If IsNumeric(texto) Then
+            NumeroSeguro = CDbl(texto)
+        Else
+            NumeroSeguro = 0
+        End If
+    End If
+
+End Function
