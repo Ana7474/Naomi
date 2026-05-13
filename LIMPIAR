@@ -1,0 +1,28 @@
+Option Explicit
+
+Sub LIMPIAR_DATOS_LAYOUT()
+
+    Dim wsDatos As Worksheet
+    Dim wsLayout As Worksheet
+    
+    Set wsDatos = ThisWorkbook.Sheets("Datos")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    
+    Application.ScreenUpdating = False
+    
+    'Limpia toda la hoja Datos, solo contenido
+    wsDatos.Cells.ClearContents
+    
+    'Limpia Layout Mesa desde B5 hacia abajo y hacia la derecha
+    'No toca columna A ni B2:B4
+    wsLayout.Range("B5:XFD" & wsLayout.Rows.Count).ClearContents
+    
+    'Limpia Layout Mesa desde C2 hacia la derecha, filas 2 a 4
+    'No toca B2:B4
+    wsLayout.Range("C2:XFD4").ClearContents
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Datos y Layout Mesa limpiados correctamente.", vbInformation
+
+End Sub
