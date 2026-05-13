@@ -1,0 +1,138 @@
+Option Explicit
+
+Sub GENERAR_CORREO_CONFIRMACION()
+
+    Dim wsCorreo As Worksheet, wsMacro As Worksheet, wsLayout As Worksheet
+    Dim OutlookApp As Object, OutlookMail As Object
+    Dim wbNuevo As Workbook
+    Dim rngTabla As Range
+    
+    Dim lastRowPara As Long, lastRowCC As Long
+    Dim lastColLayout As Long, lastRowLayout As Long
+    Dim paraCorreos As String, ccCorreos As String
+    Dim seleccion As String, asunto As String
+    Dim nombreArchivo As String, rutaArchivo As String
+    Dim i As Long
+    
+    Set wsCorreo = ThisWorkbook.Sheets("Correo")
+    Set wsMacro = ThisWorkbook.Sheets("MACRO")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    
+    seleccion = UCase(Trim(CStr(wsMacro.Range("C11").Value)))
+    
+    Select Case seleccion
+        Case "SIGLO XXI"
+            asunto = "CONFIRMACIÓN XXI " & Format(Date, "dd/mm/yyyy")
+            nombreArchivo = "SIGLO XXI"
+        
+        Case "SURA"
+            asunto = "CONFIRMACIÓN AF SURA " & Format(Date, "dd/mm/yyyy")
+            nombreArchivo = "AFORE SURA"
+        
+        Case "AFORE COPPEL"
+            asunto = "CONFIRMACIÓN AF COPPEL " & Format(Date, "dd/mm/yyyy")
+            nombreArchivo = "AFORE COPPEL"
+        
+        Case Else
+            MsgBox "Selección no válida en MACRO!C11.", vbExclamation
+            Exit Sub
+    End Select
+    
+    'PARA
+    lastRowPara = wsCorreo.Cells(wsCorreo.Rows.Count, "A").End(xlUp).Row
+    
+    For i = 2 To lastRowPara
+        If Trim(CStr(wsCorreo.Cells(i, "A").Value)) <> "" Then
+            If paraCorreos <> "" Then paraCorreos = paraCorreos & ";"
+            paraCorreos = paraCorreos & Trim(CStr(wsCorreo.Cells(i, "A").Value))
+        End If
+    Next i
+    
+    'CC
+    lastRowCC = wsCorreo.Cells(wsCorreo.Rows.Count, "B").End(xlUp).Row
+    
+    For i = 2 To lastRowCC
+        If Trim(CStr(wsCorreo.Cells(i, "B").Value)) <> "" Then
+            If ccCorreos <> "" Then ccCorreos = ccCorreos & ";"
+            ccCorreos = ccCorreos & Trim(CStr(wsCorreo.Cells(i, "B").Value))
+        End If
+    Next i
+    
+    If paraCorreos = "" Then
+        MsgBox "No hay destinatarios en la hoja Correo, columna A.", vbExclamation
+        Exit Sub
+    End If
+    
+    'Rango Layout Mesa
+    lastColLayout = wsLayout.Cells(2, wsLayout.Columns.Count).End(xlToLeft).Column
+    lastRowLayout = wsLayout.Cells(wsLayout.Rows.Count, "B").End(xlUp).Row
+    
+    If lastColLayout < 3 Or lastRowLayout < 5 Then
+        MsgBox "No hay información suficiente en Layout Mesa.", vbExclamation
+        Exit Sub
+    End If
+    
+    Set rngTabla = wsLayout.Range(wsLayout.Cells(2, 1), wsLayout.Cells(lastRowLayout, lastColLayout))
+    
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+    
+    'Crear archivo adjunto en carpeta temporal del usuario actual
+    wsLayout.Copy
+    Set wbNuevo = ActiveWorkbook
+    
+    wbNuevo.Sheets(1).Name = "Layout Mesa"
+    
+    rutaArchivo = Environ$("TEMP") & "\" & nombreArchivo & "_" & Format(Now, "yyyymmdd_hhmmss") & ".xlsx"
+    
+    wbNuevo.SaveAs Filename:=rutaArchivo, FileFormat:=51
+    wbNuevo.Close SaveChanges:=False
+    
+    Application.DisplayAlerts = True
+    
+    'Abrir Outlook del usuario actual
+    On Error Resume Next
+    Set OutlookApp = GetObject(, "Outlook.Application")
+    
+    If OutlookApp Is Nothing Then
+        Set OutlookApp = CreateObject("Outlook.Application")
+    End If
+    
+    On Error GoTo 0
+    
+    If OutlookApp Is Nothing Then
+        Application.ScreenUpdating = True
+        MsgBox "No se pudo abrir Outlook en este equipo.", vbExclamation
+        Exit Sub
+    End If
+    
+    Set OutlookMail = OutlookApp.CreateItem(0)
+    
+    With OutlookMail
+        
+        .To = paraCorreos
+        .CC = ccCorreos
+        .Subject = asunto
+        .Attachments.Add rutaArchivo
+        
+        'Display carga la firma predeterminada del usuario
+        .Display
+        
+        rngTabla.Copy
+        
+        With .GetInspector.WordEditor.Application.Selection
+            .HomeKey Unit:=6
+            .TypeText "Buen día," & vbCrLf & vbCrLf
+            .TypeText "Comparto confirmación:" & vbCrLf & vbCrLf
+            .PasteAndFormat 16
+            .TypeText vbCrLf & vbCrLf
+        End With
+    
+    End With
+    
+    Application.CutCopyMode = False
+    Application.ScreenUpdating = True
+    
+    MsgBox "Correo generado correctamente.", vbInformation
+
+End Sub
