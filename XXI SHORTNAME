@@ -1,0 +1,170 @@
+Option Explicit
+
+Sub XXI()
+
+    Dim wsDatos As Worksheet
+    Dim wsLayout As Worksheet
+    Dim wsInfo As Worksheet
+    Dim wsShortname As Worksheet
+    
+    Dim lastRow As Long
+    Dim i As Long
+    Dim filaDestino As Long
+    Dim colDestino As Long
+    Dim lastColLayout As Long
+    Dim lastRowFondos As Long
+    
+    Dim tranType As String
+    Dim ticker As String
+    Dim fund As String
+    Dim monto As Double
+    
+    Dim tranAnterior As String
+    Dim tickerAnterior As String
+    
+    Dim dictFondos As Object
+    Dim dictFilasFondos As Object
+    
+    Dim celdaEncontrada As Range
+    Dim emisora As String
+    Dim sentido As String
+    Dim cuenta As String
+    
+    Set wsDatos = ThisWorkbook.Sheets("Datos")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    Set wsInfo = ThisWorkbook.Sheets("Información")
+    Set wsShortname = ThisWorkbook.Sheets("Shortname")
+    
+    Set dictFondos = CreateObject("Scripting.Dictionary")
+    Set dictFilasFondos = CreateObject("Scripting.Dictionary")
+    
+    Application.ScreenUpdating = False
+    
+    lastRow = wsDatos.Cells(wsDatos.Rows.Count, "A").End(xlUp).Row
+    
+    'Limpiar solo el área que se va a rellenar, sin borrar formatos
+    wsLayout.Range("C:ZZ").ClearContents
+    wsLayout.Range("B5:B10000").ClearContents
+    
+    'Traer fondos únicos de Datos columna C a Layout Mesa columna B
+    filaDestino = 5
+    
+    For i = 2 To lastRow
+        
+        fund = Trim(CStr(wsDatos.Cells(i, "C").Value))
+        
+        If fund <> "" Then
+            If Not dictFondos.Exists(fund) Then
+                dictFondos.Add fund, filaDestino
+                dictFilasFondos.Add fund, filaDestino
+                
+                wsLayout.Cells(filaDestino, "B").Value = fund
+                filaDestino = filaDestino + 1
+            End If
+        End If
+    
+    Next i
+    
+    lastRowFondos = filaDestino - 1
+    
+    'Crear columnas por operación según bloques consecutivos de Tran Type + Ticker
+    colDestino = 3
+    tranAnterior = ""
+    tickerAnterior = ""
+    
+    For i = 2 To lastRow
+        
+        tranType = Trim(CStr(wsDatos.Cells(i, "A").Value))
+        ticker = Trim(CStr(wsDatos.Cells(i, "B").Value))
+        fund = Trim(CStr(wsDatos.Cells(i, "C").Value))
+        monto = CDbl(Val(wsDatos.Cells(i, "D").Value))
+        
+        'Nueva operación si cambia Tran Type o Ticker
+        If tranType <> tranAnterior Or ticker <> tickerAnterior Then
+            
+            wsLayout.Cells(2, colDestino).Value = ticker
+            
+            'Fila 3 queda libre porque en XXI no viene precio
+            wsLayout.Cells(3, colDestino).ClearContents
+            
+            wsLayout.Cells(4, colDestino).Value = tranType
+            
+            tranAnterior = tranType
+            tickerAnterior = ticker
+            
+            colDestino = colDestino + 1
+        
+        End If
+        
+        'Poner monto en la intersección operación + fondo
+        If fund <> "" Then
+            If dictFilasFondos.Exists(fund) Then
+                wsLayout.Cells(dictFilasFondos(fund), colDestino - 1).Value = monto
+            End If
+        End If
+    
+    Next i
+    
+    lastColLayout = colDestino - 1
+    
+    'Reemplazar emisoras usando Información
+    For i = 3 To lastColLayout
+        
+        emisora = Trim(CStr(wsLayout.Cells(2, i).Value))
+        
+        If emisora <> "" Then
+            
+            Set celdaEncontrada = wsInfo.Columns("B").Find( _
+                What:=emisora, _
+                LookIn:=xlValues, _
+                LookAt:=xlWhole, _
+                MatchCase:=False)
+            
+            If Not celdaEncontrada Is Nothing Then
+                wsLayout.Cells(2, i).Value = wsInfo.Cells(celdaEncontrada.Row, "A").Value
+            End If
+        
+        End If
+    
+    Next i
+    
+    'Reemplazar cuentas/fondos de Layout Mesa columna B usando Shortname
+    For i = 5 To lastRowFondos
+        
+        cuenta = Trim(CStr(wsLayout.Cells(i, "B").Value))
+        
+        If cuenta <> "" Then
+            
+            Set celdaEncontrada = wsShortname.Columns("F").Find( _
+                What:=cuenta, _
+                LookIn:=xlValues, _
+                LookAt:=xlWhole, _
+                MatchCase:=False)
+            
+            If Not celdaEncontrada Is Nothing Then
+                wsLayout.Cells(i, "B").Value = wsShortname.Cells(celdaEncontrada.Row, "A").Value
+            End If
+        
+        End If
+    
+    Next i
+    
+    'Cambiar BUY/SELL por COMPRA/VENTA en fila 4
+    For i = 3 To lastColLayout
+        
+        sentido = UCase(Trim(CStr(wsLayout.Cells(4, i).Value)))
+        
+        Select Case sentido
+            Case "BUY"
+                wsLayout.Cells(4, i).Value = "COMPRA"
+            Case "SELL"
+                wsLayout.Cells(4, i).Value = "VENTA"
+        End Select
+    
+    Next i
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Layout Mesa generado correctamente para XXI.", vbInformation
+
+End Sub
