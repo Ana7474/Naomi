@@ -1,0 +1,132 @@
+Option Explicit
+
+Sub GENERAR_CORREO_CONFIRMACION()
+
+    Dim wsCorreo As Worksheet
+    Dim wsMacro As Worksheet
+    Dim wsLayout As Worksheet
+    
+    Dim OutlookApp As Object
+    Dim OutlookMail As Object
+    
+    Dim lastRowPara As Long
+    Dim lastRowCC As Long
+    Dim lastColLayout As Long
+    Dim lastRowLayout As Long
+    
+    Dim paraCorreos As String
+    Dim ccCorreos As String
+    Dim seleccion As String
+    Dim asunto As String
+    Dim nombreArchivo As String
+    Dim rutaArchivo As String
+    
+    Dim wbNuevo As Workbook
+    Dim rngTabla As Range
+    
+    Set wsCorreo = ThisWorkbook.Sheets("Correo")
+    Set wsMacro = ThisWorkbook.Sheets("MACRO")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    
+    seleccion = UCase(Trim(CStr(wsMacro.Range("C11").Value)))
+    
+    Select Case seleccion
+        Case "SIGLO XXI"
+            asunto = "CONFIRMACIÓN XXI " & Format(Date, "dd/mm/yyyy")
+            nombreArchivo = "SIGLO XXI"
+        
+        Case "SURA"
+            asunto = "CONFIRMACIÓN AF SURA " & Format(Date, "dd/mm/yyyy")
+            nombreArchivo = "AFORE SURA"
+        
+        Case "AFORE COPPEL"
+            asunto = "CONFIRMACIÓN AF COPPEL " & Format(Date, "dd/mm/yyyy")
+            nombreArchivo = "AFORE COPPEL"
+        
+        Case Else
+            MsgBox "Selección no válida en MACRO!C11." & vbCrLf & _
+                   "Debe decir: SIGLO XXI, SURA o AFORE COPPEL.", _
+                   vbExclamation
+            Exit Sub
+    End Select
+    
+    'Destinatarios PARA
+    lastRowPara = wsCorreo.Cells(wsCorreo.Rows.Count, "A").End(xlUp).Row
+    
+    If lastRowPara >= 2 Then
+        paraCorreos = Join(Application.Transpose(wsCorreo.Range("A2:A" & lastRowPara).Value), ";")
+    End If
+    
+    'Destinatarios CC
+    lastRowCC = wsCorreo.Cells(wsCorreo.Rows.Count, "B").End(xlUp).Row
+    
+    If lastRowCC >= 2 Then
+        ccCorreos = Join(Application.Transpose(wsCorreo.Range("B2:B" & lastRowCC).Value), ";")
+    End If
+    
+    'Rango de Layout Mesa
+    lastColLayout = wsLayout.Cells(2, wsLayout.Columns.Count).End(xlToLeft).Column
+    lastRowLayout = wsLayout.Cells(wsLayout.Rows.Count, "B").End(xlUp).Row
+    
+    If lastColLayout < 1 Or lastRowLayout < 2 Then
+        MsgBox "No hay información suficiente en Layout Mesa.", vbExclamation
+        Exit Sub
+    End If
+    
+    Set rngTabla = wsLayout.Range(wsLayout.Cells(2, 1), wsLayout.Cells(lastRowLayout, lastColLayout))
+    
+    'Crear archivo adjunto con solo Layout Mesa
+    wsLayout.Copy
+    
+    Set wbNuevo = ActiveWorkbook
+    
+    Application.DisplayAlerts = False
+    wbNuevo.Sheets(1).Name = "Layout Mesa"
+    Application.DisplayAlerts = True
+    
+    rutaArchivo = Environ$("TEMP") & "\" & nombreArchivo & ".xlsx"
+    
+    Application.DisplayAlerts = False
+    wbNuevo.SaveAs Filename:=rutaArchivo, FileFormat:=xlOpenXMLWorkbook
+    wbNuevo.Close SaveChanges:=False
+    Application.DisplayAlerts = True
+    
+    'Crear correo Outlook
+    On Error Resume Next
+    Set OutlookApp = GetObject(Class:="Outlook.Application")
+    If OutlookApp Is Nothing Then
+        Set OutlookApp = CreateObject("Outlook.Application")
+    End If
+    On Error GoTo 0
+    
+    If OutlookApp Is Nothing Then
+        MsgBox "No se pudo abrir Outlook.", vbExclamation
+        Exit Sub
+    End If
+    
+    Set OutlookMail = OutlookApp.CreateItem(0)
+    
+    With OutlookMail
+        .To = paraCorreos
+        .CC = ccCorreos
+        .Subject = asunto
+        
+        .Display
+        
+        rngTabla.Copy
+        
+        With .GetInspector.WordEditor.Application.Selection
+            .TypeText "Buen día," & vbCrLf & vbCrLf
+            .TypeText "Comparto confirmación:" & vbCrLf & vbCrLf
+            .PasteAndFormat 16
+            .TypeText vbCrLf & vbCrLf
+        End With
+        
+        .Attachments.Add rutaArchivo
+    End With
+    
+    Application.CutCopyMode = False
+    
+    MsgBox "Correo generado correctamente.", vbInformation
+
+End Sub
