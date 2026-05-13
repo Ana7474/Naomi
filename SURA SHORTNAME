@@ -1,0 +1,138 @@
+Option Explicit
+
+Sub SURA()
+
+    Dim wsDatos As Worksheet
+    Dim wsLayout As Worksheet
+    Dim wsInfo As Worksheet
+    Dim wsShortname As Worksheet
+    
+    Dim lastRow As Long, lastCol As Long
+    Dim i As Long, j As Long
+    Dim colDestino As Long
+    Dim filaCajas As Long
+    Dim lastColLayout As Long
+    Dim lastFilaCajas As Long
+    
+    Dim celdaEncontrada As Range
+    Dim emisora As String
+    Dim cuenta As String
+    
+    Dim sumaCajas As Double
+    Dim titulos As Double
+    Dim diferencia As Double
+    
+    Set wsDatos = ThisWorkbook.Sheets("Datos")
+    Set wsLayout = ThisWorkbook.Sheets("Layout Mesa")
+    Set wsInfo = ThisWorkbook.Sheets("Información")
+    Set wsShortname = ThisWorkbook.Sheets("Shortname")
+    
+    Application.ScreenUpdating = False
+    
+    lastRow = wsDatos.Cells(wsDatos.Rows.Count, "A").End(xlUp).Row
+    lastCol = wsDatos.Cells(1, wsDatos.Columns.Count).End(xlToLeft).Column
+    
+    'VALIDACIÓN INICIAL:
+    'La suma de E:lastCol debe ser igual a D en cada fila
+    For i = 2 To lastRow
+        
+        sumaCajas = Application.WorksheetFunction.Sum(wsDatos.Range(wsDatos.Cells(i, 5), wsDatos.Cells(i, lastCol)))
+        titulos = CDbl(Val(wsDatos.Cells(i, "D").Value))
+        diferencia = sumaCajas - titulos
+        
+        If Abs(diferencia) > 0.01 Then
+            Application.ScreenUpdating = True
+            
+            MsgBox "La fila " & i & " no cuadra." & vbCrLf & _
+                   "Suma de cajas: " & Format(sumaCajas, "#,##0.00") & vbCrLf & _
+                   "Títulos en D: " & Format(titulos, "#,##0.00") & vbCrLf & _
+                   "Diferencia: " & Format(diferencia, "#,##0.00"), _
+                   vbExclamation, "Validación de títulos"
+            
+            Exit Sub
+        End If
+    
+    Next i
+    
+    lastColLayout = 3 + (lastRow - 2)
+    lastFilaCajas = 5 + (lastCol - 5)
+    
+    'Limpia SOLO el área que vamos a volver a llenar
+    wsLayout.Range(wsLayout.Cells(2, 3), wsLayout.Cells(lastFilaCajas, lastColLayout)).ClearContents
+    wsLayout.Range(wsLayout.Cells(5, 2), wsLayout.Cells(lastFilaCajas, 2)).ClearContents
+    
+    'Cajas de Datos E en adelante van en Layout Mesa columna B
+    filaCajas = 5
+    
+    For j = 5 To lastCol
+        wsLayout.Cells(filaCajas, "B").Value = wsDatos.Cells(1, j).Value
+        filaCajas = filaCajas + 1
+    Next j
+    
+    'Cada fila de Datos se vuelve una columna en Layout Mesa, desde C
+    colDestino = 3
+    
+    For i = 2 To lastRow
+        
+        wsLayout.Cells(2, colDestino).Value = wsDatos.Cells(i, "B").Value 'Emisora
+        wsLayout.Cells(3, colDestino).Value = wsDatos.Cells(i, "C").Value 'Precio
+        wsLayout.Cells(4, colDestino).Value = wsDatos.Cells(i, "A").Value 'Operación
+        
+        filaCajas = 5
+        
+        For j = 5 To lastCol
+            wsLayout.Cells(filaCajas, colDestino).Value = wsDatos.Cells(i, j).Value
+            filaCajas = filaCajas + 1
+        Next j
+        
+        colDestino = colDestino + 1
+    
+    Next i
+    
+    'Reemplazar emisoras de Layout Mesa fila 2 usando Información
+    For j = 3 To lastColLayout
+        
+        emisora = Trim(CStr(wsLayout.Cells(2, j).Value))
+        
+        If emisora <> "" Then
+            
+            Set celdaEncontrada = wsInfo.Columns("B").Find( _
+                What:=emisora, _
+                LookIn:=xlValues, _
+                LookAt:=xlWhole, _
+                MatchCase:=False)
+            
+            If Not celdaEncontrada Is Nothing Then
+                wsLayout.Cells(2, j).Value = wsInfo.Cells(celdaEncontrada.Row, "A").Value
+            End If
+        
+        End If
+    
+    Next j
+    
+    'Reemplazar cuentas de Layout Mesa columna B usando Shortname
+    For i = 5 To lastFilaCajas
+        
+        cuenta = Trim(CStr(wsLayout.Cells(i, "B").Value))
+        
+        If cuenta <> "" Then
+            
+            Set celdaEncontrada = wsShortname.Columns("F").Find( _
+                What:=cuenta, _
+                LookIn:=xlValues, _
+                LookAt:=xlWhole, _
+                MatchCase:=False)
+            
+            If Not celdaEncontrada Is Nothing Then
+                wsLayout.Cells(i, "B").Value = wsShortname.Cells(celdaEncontrada.Row, "A").Value
+            End If
+        
+        End If
+    
+    Next i
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Layout Mesa generado correctamente para SURA.", vbInformation
+
+End Sub
